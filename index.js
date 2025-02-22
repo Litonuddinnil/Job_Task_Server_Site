@@ -18,9 +18,7 @@ const port = process.env.PORT || 5000;
 app.use(express.json());
 app.use(
   cors({
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin:["http://localhost:5173","https://job-task-server-site.vercel.app"],
     credentials: true,
   })
 );
@@ -29,7 +27,7 @@ app.use(
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:5173","https://job-task-server-site.vercel.app"],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type"],
     credentials: true,
@@ -53,12 +51,9 @@ async function run() {
     const tasksCollection = client.db("jobTaskCollection").collection("tasks");
     const userCollection = client.db("jobTaskCollection").collection("users");
 
-    console.log("MongoDB connected");
-
     // Real-time MongoDB Change Streams
     const changeStream = tasksCollection.watch();
     changeStream.on("change", (change) => {
-      console.log("Task Change Detected:", change);
       io.emit("taskUpdated", change);
     });
 
@@ -66,44 +61,36 @@ async function run() {
     // users
     app.get("/users", async (req, res) => {
       try {
-        // Fetch all users from the database
         const result = await userCollection.find().toArray();
-        console.log("Fetched users:", result);
         res.status(200).json(result);
       } catch (error) {
-        console.error("Error fetching users:", error);
         res.status(500).json({ message: "Error fetching users" });
       }
     });
-    
+
     app.post("/users", async (req, res) => {
       const newUser = req.body;
-      console.log("Creating new user:", newUser);
       const result = await userCollection.insertOne(newUser);
       io.emit("taskAdded", newUser);
-      console.log("New user added:", newUser);
       res.status(201).json({ ...newUser, _id: result.insertedId });
     });
 
     // ✅ Get All Tasks (For Logged-in User)
     app.get("/tasks", async (req, res) => {
-      
       try {
         const tasks = await tasksCollection
           .find()
           .sort({ timestamp: 1 })
-          .toArray(); 
+          .toArray();
         res.json(tasks);
       } catch (error) {
-        console.error("Error fetching tasks:", error);
         res.status(500).json({ message: "Error fetching tasks from database." });
       }
     });
 
     // ✅ Create a New Task
     app.post("/tasks", async (req, res) => {
-      const { title, description, category } = req.body;
-      console.log("Received task creation request:", title, description, category);
+      const { title, description, category, deadline, budget } = req.body;
       if (!title || title.length > 50)
         return res.status(400).json({ message: "Title is required (Max 50 chars)" });
 
@@ -112,15 +99,15 @@ async function run() {
           title,
           description: description || "",
           timestamp: new Date(),
-          category: category || "To-Do", 
+          category: category || "To-Do",
+          deadline,
+          budget,
         };
 
         const result = await tasksCollection.insertOne(newTask);
         io.emit("taskAdded", newTask);
-        console.log("New task created:", newTask);
         res.status(201).json({ ...newTask, _id: result.insertedId });
       } catch (error) {
-        console.error("Error creating task:", error);
         res.status(500).json({ message: "Error creating task", error });
       }
     });
@@ -128,13 +115,12 @@ async function run() {
     // ✅ Update Task (Title, Description, Category)
     app.put("/tasks/:id", async (req, res) => {
       const id = req.params.id;
-      
+       
       const { category } = req.body;
-      console.log(`Updating task with ID: ${id}`, category);
 
       try {
         const result = await tasksCollection.updateOne(
-          { _id: new ObjectId(id)},
+          { _id: new ObjectId(id) },
           {
             $set: { category },
           }
@@ -144,10 +130,8 @@ async function run() {
           return res.status(404).json({ message: "Task not found or not modified" });
 
         io.emit("taskUpdated", { operationType: "update", documentKey: { _id: id } });
-        console.log("Task updated successfully:", id);
         res.json({ message: "Task updated successfully" });
       } catch (error) {
-        console.error("Error updating task:", error);
         res.status(500).json({ message: "Error updating task", error });
       }
     });
@@ -155,49 +139,42 @@ async function run() {
     // ✅ Delete Task
     app.delete("/tasks/:id", async (req, res) => {
       const id = req.params.id;
-      console.log(`Deleting task with ID: ${id}`);
 
       try {
         const result = await tasksCollection.deleteOne({
           _id: new ObjectId(id),
-          userId: req.user.uid,
         });
 
         if (result.deletedCount === 0)
           return res.status(404).json({ message: "Task not found" });
 
         io.emit("taskDeleted", { _id: id });
-        console.log("Task deleted successfully:", id);
         res.json({ message: "Task deleted successfully" });
       } catch (error) {
-        console.error("Error deleting task:", error);
         res.status(500).json({ message: "Error deleting task", error });
       }
-    });
-
-    // ✅ Reorder Tasks (Drag & Drop)
-    app.put("/tasks/reorder", async (req, res) => {
-      const { tasks } = req.body;
-      console.log("Reordering tasks:", tasks);
-      if (!Array.isArray(tasks)) return res.status(400).json({ message: "Invalid format" });
-
-      try {
-        const bulkUpdates = tasks.map((task, index) => ({
-          updateOne: {
-            filter: { _id: new ObjectId(task._id), userId: req.user.uid },
-            update: { $set: { order: index } },
-          },
-        }));
-
-        await tasksCollection.bulkWrite(bulkUpdates);
-        io.emit("tasksReordered", tasks);
-        console.log("Tasks reordered successfully");
-        res.json({ message: "Tasks reordered successfully" });
-      } catch (error) {
-        console.error("Error reordering tasks:", error);
-        res.status(500).json({ message: "Error reordering tasks", error });
-      }
-    });
+    });  
+    app.put('/task/edit/:id', async (req, res) => {
+       const id = req.params.id;
+       const { category,title,description,budget } = req.body;
+        console.log(category)
+       try {
+         const result = await tasksCollection.updateOne(
+           { _id: new ObjectId(id) },
+           {
+             $set: { category,title,description,budget },
+           }
+         );
+ 
+         if (result.modifiedCount === 0)
+           return res.status(404).json({ message: "Task not found or not modified" });
+ 
+         io.emit("taskUpdated", { operationType: "update", documentKey: { _id: id } });
+         res.json({ message: "Task updated successfully" });
+       } catch (error) {
+         res.status(500).json({ message: "Error updating task", error });
+       }
+  });
   } catch (error) {
     console.error("MongoDB connection error:", error);
   }
