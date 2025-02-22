@@ -34,7 +34,7 @@ app.use((req, res, next) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "https://job-task-cae1b.web.app"],
+    origin: ["http://localhost:5173", "https://job-task-cae1b.web.app","https://job-task-server-site.onrender.com"],
     methods: ["GET", "POST"],
     credentials: true,
   },
