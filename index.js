@@ -157,7 +157,7 @@ async function run() {
     app.put('/task/edit/:id', async (req, res) => {
        const id = req.params.id;
        const { category,title,description,budget } = req.body;
-        console.log(category)
+       
        try {
          const result = await tasksCollection.updateOne(
            { _id: new ObjectId(id) },
