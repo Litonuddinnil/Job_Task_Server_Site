@@ -8,37 +8,35 @@ const { Server } = require("socket.io");
 const app = express();
 const port = process.env.PORT || 5000;
 
+const allowedOrigins = [
+  "http://localhost:5173", // Local Development
+  "https://job-task-cae1b.web.app", // Deployed Frontend
+];
+
 // ✅ CORS Middleware
 app.use(
   cors({
     origin: (origin, callback) => {
-      callback(null, origin || "*"); // Allow all origins dynamically
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, origin);
+      } else {
+        callback(new Error("CORS not allowed"));
+      }
     },
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
+    credentials: true, // ✅ Must be true for authentication
   })
 );
 
 // ✅ Express Middleware
 app.use(express.json());
 
-// ✅ Custom CORS Headers (for WebSockets & other requests)
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  next();
-});
-
-// ✅ HTTP Server & WebSocket Setup
+// ✅ WebSocket (Socket.io) er jonno CORS setup
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      callback(null, origin || "*"); // Allow all origins dynamically
-    },
+    origin: allowedOrigins, // ✅ WebSockets er jonno specific origin dite hobe
     methods: ["GET", "POST"],
     credentials: true,
   },
