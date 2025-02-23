@@ -108,7 +108,7 @@ async function run() {
       const updatedTask = req.body;
       try {
         const result = await tasksCollection.updateOne(
-          { _id: new ObjectId(id) },
+          { _id: id },
           { $set: updatedTask }
         );
         if (result.modifiedCount === 0) return res.status(404).json({ message: "Task not found" });
