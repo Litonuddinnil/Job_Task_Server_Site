@@ -103,12 +103,12 @@ async function run() {
       }
     });
 
-    app.put("/tasks/:id", async (req, res) => {
+    app.patch("/tasks/:id", async (req, res) => {
       const id = req.params.id;
       const updatedTask = req.body;
       try {
         const result = await tasksCollection.updateOne(
-          { _id: id },
+          { _id: new ObjectId(id) },
           { $set: updatedTask }
         );
         if (result.modifiedCount === 0) return res.status(404).json({ message: "Task not found" });
